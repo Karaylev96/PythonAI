@@ -1,15 +1,9 @@
-import os
-from langchain_openai import OpenAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from dotenv import load_dotenv
+from langchain_community.vectorstores import FAISS
 
-load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
-if api_key and api_key.startswith("sk-"):
-    print("api_key Work")
-else:
-    print("api_key not Work")
+from HuggingFaceEmbeddingsService import get_ai_model
+from AiApiKey import get_api_key
 
 def split_pdf_lang_chain(path):
     loader = PyPDFLoader(path)
@@ -22,10 +16,20 @@ def split_pdf_lang_chain(path):
     )
     chunks = text_split.split_documents(data)
 
-    embeddings_model = OpenAIEmbeddings(model="text-embedding-3-small")
-
     texts = [chunk.page_content for chunk in chunks]
-    vectors = embeddings_model.embed_documents(texts)
+
+    local_embeddings = get_ai_model()
+    vectors = local_embeddings.embed_documents(texts)
+
+    vector_db = FAISS.from_documents(chunks, local_embeddings)
+
+    vector_db.save_local("faiss_pdf")
+
+    new_db = FAISS.load_local("faiss_pdf", local_embeddings, allow_dangerous_deserialization=True)
+
+    query = "Дайте петте най-важни думи от документа?"
+    docs = new_db.similarity_search(query, k=3)
+
     data = []
     for i, chunk in enumerate(chunks):
         item = {
@@ -36,7 +40,9 @@ def split_pdf_lang_chain(path):
         data.append(item)
     return data
 
-pdf_path = "C:/Users/Public/test_chunks.pdf"
+
+api_key = get_api_key()
+pdf_path = "/Users/georgikarajlev/Downloads/PrezentaciqZashtitaIvaVukova.pdf"
 all_chuncks = split_pdf_lang_chain(pdf_path)
 
 print(f"Chunks count: {len(all_chuncks)}")

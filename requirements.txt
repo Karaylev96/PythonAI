@@ -1,4 +1,8 @@
-langchain langchain-community pypdf
+langchain 
+langchain-community
 langchain-openai
 langchain
 python-dotenv
+pypdf
+sentence-transformers
+faiss-cpu

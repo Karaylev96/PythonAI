@@ -1,65 +1,47 @@
+import os
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
 
-from HuggingFaceEmbeddingsService import get_ai_model
-from AiApiKey import get_api_key
+FAISS_INDEX_PATH = "faiss_pdf_index"
 
-def get_contex_query(question, vector_db, k=3):
-    docs_with_score = vector_db.similarity_search_with_score(question, k)
-    relevant_docs = sorted(docs_with_score, key=lambda x: x[1])
-    retrived_texts = []
+def get_context_query(question, vector_db, k=3):
+    docs_with_score = vector_db.similarity_search_with_score(question, k=k)
+    retrieved_texts = []
     seen_content = set()
 
-    for doc, score in relevant_docs:
-        content =doc.page_content.strip()
+    for doc, score in docs_with_score:
+        content = doc.page_content.strip()
         if content not in seen_content:
-            retrived_texts.append(content)
+            retrieved_texts.append(content)
             seen_content.add(content)
-    context_block = "\n\n---\n\n".join(retrived_texts)
-    return context_block
+            
+    return "\n\n---\n\n".join(retrieved_texts)
 
-def split_pdf_lang_chain(path):
+def process_pdf_locally(path):
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    
     loader = PyPDFLoader(path)
     data = loader.load()
 
-    text_split = RecursiveCharacterTextSplitter(
+    text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=100,
         separators=["\n\n", "\n", " ", ""]
     )
-    chunks = text_split.split_documents(data)
+    chunks = text_splitter.split_documents(data)
 
-    texts = [chunk.page_content for chunk in chunks]
+    vector_db = FAISS.from_documents(chunks, embeddings)
 
-    local_embeddings = get_ai_model()
-    vectors = local_embeddings.embed_documents(texts)
-
-    vector_db = FAISS.from_documents(chunks, local_embeddings)
-
-    vector_db.save_local("faiss_pdf")
-
-    new_db = FAISS.load_local("faiss_pdf", local_embeddings, allow_dangerous_deserialization=True)
-
+    vector_db.save_local(FAISS_INDEX_PATH)
+    
     query = "Дайте петте най-важни думи от документа?"
-    docs = new_db.similarity_search(query, k=3)
-    context = get_contex_query(query)
+    context = get_context_query(query, vector_db)
+    
+    return chunks, context
 
-    data = []
-    for i, chunk in enumerate(chunks):
-        item = {
-            "vector": vectors[i],
-            "text": chunk.page_content,
-            "metadata": chunk.metadata
-        }
-        data.append(item)
-    return data
-
-
-api_key = get_api_key()
-pdf_path = "/Users/georgikarajlev/Downloads/PrezentaciqZashtitaIvaVukova.pdf"
-all_chuncks = split_pdf_lang_chain(pdf_path)
-
-print(f"Chunks count: {len(all_chuncks)}")
-print(f"Chunks count: {len(all_chuncks[0]['vector'])}")
-
+if __name__ == "__main__":
+    pdf_path = ".pdf" 
+    if os.path.exists(pdf_path):
+        chunks, context = process_pdf_locally(pdf_path)

@@ -6,3 +6,7 @@ python-dotenv
 pypdf
 sentence-transformers
 faiss-cpu
+fastapi
+uvicorn
+langchain-huggingface
+python-multipart

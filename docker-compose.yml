@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  rag-service:
+    build: .
+    container_name: rag_microservice
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./faiss_pdf_index:/app/faiss_pdf_index
+      - ./uploads:/app/uploads
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: always

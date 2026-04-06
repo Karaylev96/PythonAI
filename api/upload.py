@@ -1,22 +1,15 @@
 import os
 import shutil
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from contextlib import asynccontextmanager
+from fastapi import UploadFile, File, HTTPException, APIRouter
 from pydantic import BaseModel
 from services import vector_manager
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    vector_manager.load_database()
-    yield
-
-app = FastAPI(title="RAG service", lifespan=lifespan)
-
+router = APIRouter(prefix="/upload", tags=["upload"])
 class QueryRequest(BaseModel):
     question: str
     top_k: int = 3
 
-@app.post("/upload")
+@router.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files.")
@@ -36,7 +29,7 @@ async def upload_pdf(file: UploadFile = File(...)):
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
-@app.post("/ask")
+@router.post("/ask")
 async def ask_question(request: QueryRequest):
     results = vector_manager.search(request.question, k=request.top_k)
     
@@ -57,6 +50,3 @@ async def ask_question(request: QueryRequest):
         "sources": formatted_results
     }
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)

@@ -3,11 +3,18 @@ import shutil
 from fastapi import UploadFile, File, HTTPException, APIRouter
 from pydantic import BaseModel
 from services import vector_manager
+from typing import Optional, List, Dict
+from answerQuestionAgentEngine import ai_agent
 
 router = APIRouter(prefix="/upload", tags=["upload"])
 class QueryRequest(BaseModel):
     question: str
     top_k: int = 3
+
+class AgentResponce(BaseModel):
+    question: str
+    answer: str
+    intermediate_steps: Optional[List[str]] = None
 
 @router.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
@@ -50,3 +57,10 @@ async def ask_question(request: QueryRequest):
         "sources": formatted_results
     }
 
+@router.post("/agent/ask", response_model=AgentResponce)
+async def ask_ai_agent(request: QueryRequest):
+    try:
+        answer = await ai_agent.run(request.question)
+        return AgentResponce(question=request.question, answer=answer)
+    except Exception as e:
+        return {"question": request.question, "answer": f"Error: {str(e)}"}

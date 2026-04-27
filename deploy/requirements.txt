@@ -1,7 +1,7 @@
 langchain 
 langchain-community
 langchain-openai
-langchain
+langchainhub
 python-dotenv
 pypdf
 sentence-transformers
